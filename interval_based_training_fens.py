@@ -284,6 +284,6 @@ history = model_triplet.fit(
     [X_train_anchors, X_train_positives, X_train_negatives], 
     dummy_labels,
     epochs=50,  
-    batch_size=32,  
-    validation_split=0.1  
+    batch_size=32 
+    #validation_split=0.1  
 )
