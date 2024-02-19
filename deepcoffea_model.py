@@ -10,7 +10,7 @@ from keras.layers import Conv1D, Conv2D
 from keras.layers import MaxPooling1D, MaxPooling2D, GlobalAveragePooling1D
 from keras.layers import Dropout
 from keras.layers import BatchNormalization
-from keras.layers import Flatten
+from keras.layers import Flatten, Reshape
 from keras.initializers import glorot_uniform
 from keras.initializers import RandomNormal
 
@@ -26,9 +26,13 @@ def transformer_block(x, num_heads, key_dim, ff_dim):
     ff_output = Dense(x.shape[-1])(ff_output)
     return LayerNormalization(epsilon=1e-6)(x + ff_output)
 
-def create_model_e(input_shape, emb_size=None, model_name=''):
+def create_model_e(emb_size=64, model_name=''):
     # -----------------Entry flow -----------------
-    input_data = Input(shape=input_shape)
+
+    input_data = Input(shape=(emb_size,)) 
+    input_data1 = input_data
+    input_data = Reshape((emb_size, 1))(input_data)
+    print(input_data)
 
     filter_num = ['None', 32, 64, 128, 256]
     kernel_size = ['None', 8, 8, 8, 8]
@@ -79,16 +83,19 @@ def create_model_e(input_shape, emb_size=None, model_name=''):
 
     dense_layer = Dense(emb_size, name='FeaturesVec'+'_'+model_name)(output)
 
-    shared_conv2 = Model(inputs=input_data, outputs=dense_layer, name=model_name)
+    shared_conv2 = Model(inputs=input_data1, outputs=dense_layer, name=model_name)
 
     print('SHAPE OF MODEL')
     print(shared_conv2.summary())
     return shared_conv2
 
 
-def create_model(input_shape=None, emb_size=None, model_name=''):
+def create_model(emb_size=64, model_name=''):
     # -----------------Entry flow -----------------
-    input_data = Input(shape=input_shape)
+    input_data = Input(shape=(emb_size,)) 
+    input_data1 = input_data
+    input_data = Reshape((emb_size, 1))(input_data)
+    print(input_data)
 
     filter_num = ['None', 32, 64, 128, 256]
     kernel_size = ['None', 8, 8, 8, 8]
@@ -134,18 +141,14 @@ def create_model(input_shape=None, emb_size=None, model_name=''):
     model = MaxPooling1D(pool_size=pool_size[4], strides=pool_stride_size[4],
                          padding='same', name='block4_pool'+'_'+model_name)(model)
 
-    #output = Flatten()(model)
 
-    #model = GlobalAveragePooling1D(name='cnn_global_avg_pool'+'_'+model_name)(model)
     model = transformer_block(model, num_heads=16, key_dim=64, ff_dim=128)
-    #new line
-    # Flatten and Dense layer
-    
+
     output = Flatten()(model)
 
     dense_layer = Dense(emb_size, name='FeaturesVec'+'_'+model_name)(output)
 
-    shared_conv2 = Model(inputs=input_data, outputs=dense_layer, name=model_name)
+    shared_conv2 = Model(inputs=input_data1, outputs=dense_layer, name=model_name)
 
     print('SHAPE OF MODEL after trans')
     print(shared_conv2.summary())
