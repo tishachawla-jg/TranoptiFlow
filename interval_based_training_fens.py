@@ -1,13 +1,9 @@
 from __future__ import print_function
-
-try:
-    import cPickle as thepickle
-except ImportError:
-    import _pickle as thepickle
+import _pickle as thepickle
 from tensorflow.python.tools import module_util as _module_util
 #from tensorflow.keras.callbacks import LambdaCallbacky
 from tensorflow.python.keras import backend as ktf
-from deepcoffea_model import create_model_e
+from deepcoffea_model import create_model, create_model_e
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam, SGD, RMSprop
 #from tensorflow.keras.optimizers import legacy
@@ -39,11 +35,24 @@ loss_history = []
 parser = argparse.ArgumentParser()
 loss = 1
 
+def get_params():
+    parser.add_argument ('--tor_len', required=False, default=800)
+    parser.add_argument ('--exit_len', required=False, default=800)
+    parser.add_argument ('--win_interval', required=False, default=5)
+    parser.add_argument ('--num_window', required=False, default=11)
+    parser.add_argument ('--alpha', required=False, default=0.1)
+    parser.add_argument ('--input', required=False, default='/data/website-fingerprinting/datasets/new_dcf/crawle_new_overlap_interval_without_windows_single')
+    parser.add_argument ('--test', required=False, default='/data/seoh/DeepCCA_model/crawle_overlap_new2021_interal')
+    parser.add_argument ('--model', required=False, default="/data/seoh/DeepCCA_model/crawle_overlap_new2021_")
+    args = parser.parse_args ()
+    return args
+
 def get_session(gpu_fraction=0.85):
     #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_fraction,allow_growth=True)
     gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=gpu_fraction, allow_growth=True)
     return tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options))
 
+args = get_params()
 ktf.set_session(get_session())
 
 # Load the dataset
@@ -141,11 +150,14 @@ print('dim red size', np.array(traces_test_embedded).shape)
 feature_count = np.array(traces_test_embedded).shape[-1]
 
 #Inputs for the triplet loss model
+
 anchor = Input(shape=(2,), name='anchor')
 positive = Input(shape=(2,), name='positive')
 negative = Input(shape=(2,), name='negative')
 
-shared_model = create_model_e(emb_size=64, model_name='shared')
+# Shared models
+#input_shape = (64, 1)
+shared_model = create_model(emb_size=64, model_name='shared')
 
 def create_combined_model(embedding_model, shared_model):
     input_shape = (2,)  # Assuming the original input shape for your embeddings
@@ -201,7 +213,7 @@ loss_layer = TripletLossLayer(name='triplet_loss_layer')([pos_sim, neg_sim])
 
 model_triplet = Model(
     inputs=[anchor, positive, negative],
-    outputs=loss_layer  
+    outputs=loss_layer  # Or just 'loss_layer' if you want the loss as output
 )
 
 #opt = optimizers.SGD(learning_rate=0.001, momentum=0.9, nesterov=True)
@@ -213,7 +225,7 @@ model_triplet.compile(optimizer=opt)
 print('check for model compilation')
 
 def generate_embeddings(data):
-    #we have already embedded above
+    #we have already embeedded above
     embeddings = normalize(data)
     print('embeddings done')
     return data
@@ -266,12 +278,12 @@ X_train_negatives = np.array([traces_train[k] for k in triplets[:, 2]])
 dummy_labels = np.zeros((len(X_train_anchors),))
 
 
-print('check before fitting')
+print('check before history')
 #  Fit the model
 history = model_triplet.fit(
     [X_train_anchors, X_train_positives, X_train_negatives], 
     dummy_labels,
     epochs=50,  
-    batch_size=64
-    #validation_split=0.1  
+    batch_size=32,  
+    validation_split=0.1  
 )
